@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: system-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/xcplus_system?serverTimezone=UTC&userUnicode=true&useSSL=false&
+    username: root
+    password: Dd123456.
+#  cloud:
+#   nacos:
+#     server-addr: 192.168.77.1:8848
+#     discovery:
+#       namespace: dev01
+#       group: xuecheng-plus-project
+#     config:
+#       namespace: dev01
+#       group: xuecheng-plus-project
+#       file-extension: yaml
+#       refresh-enabled: true
+#       extension-configs:
+#         - data-id: system-api-${spring.profiles.active}.yaml
+#           group: xuecheng-plus-project
+#           refresh: true
+#  profiles:
+#    active: dev
+logging:
+  config: classpath:log4j2-dev.xml
+
+
