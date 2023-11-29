@@ -1,12 +1,7 @@
-
+#微服务配置
 spring:
   application:
-    name: system-service
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/xcplus_system?serverTimezone=UTC&userUnicode=true&useSSL=false&
-    username: root
-    password: Dd123456.
+    name: gateway
   cloud:
     nacos:
       server-addr: 127.0.0.1:8848
@@ -24,6 +19,3 @@ spring:
             refresh: true
   profiles:
     active: dev
-server:
-  port: 63110
-
