@@ -1,5 +1,5 @@
 ### 查询课程信息
-POST {{content_host}}/content/course/list?pageNo=1&pageSize=2
+POST {{gateway_host}}/content/course/list?pageNo=1&pageSize=2
 Content-Type: application/json
 
 {
@@ -12,7 +12,7 @@ Content-Type: application/json
 GET {{gateway_host}}/content/course-category/tree-nodes
 
 ### 新增课程
-POST {{content_host}}/content/course
+POST {{gateway_host}}/content/course
 Content-Type: application/json
 
 {
@@ -25,7 +25,7 @@ Content-Type: application/json
   "validDays": 365,
   "mt": "1-1",
   "st": "1-1-1",
-  "name": "",
+  "name": "hahahhaha",
   "pic": "fdsf",
   "teachmode": "200002",
   "users": "初级人员",
@@ -33,3 +33,14 @@ Content-Type: application/json
   "grade": "204001",
   "description": "java网络编程高级java网络编程高级java网络编程高级"
 }
+#### 上传文件
+POST {{media_host}}/media/upload/coursefile
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="filedata"; filename="1234.jpg"
+Content-Type: application/octet-stream
+
+< d:/123/1234.jpg
+
+

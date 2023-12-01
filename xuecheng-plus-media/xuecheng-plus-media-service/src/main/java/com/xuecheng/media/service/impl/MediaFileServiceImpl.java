@@ -1,5 +1,6 @@
 package com.xuecheng.media.service.impl;
 
+import cn.hutool.crypto.digest.MD5;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.j256.simplemagic.ContentInfo;
@@ -16,6 +17,7 @@ import com.xuecheng.media.model.po.MediaFiles;
 import com.xuecheng.media.service.MediaFileService;
 import io.minio.BucketArgs;
 import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
 import io.minio.UploadObjectArgs;
 import io.minio.errors.*;
 import lombok.extern.slf4j.Slf4j;
@@ -32,10 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.swing.plaf.metal.MetalDesktopIconUI;
 import java.awt.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.security.InvalidKeyException;
@@ -44,6 +43,10 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.io.File;
+import java.io.FileInputStream;
+import org.apache.commons.codec.digest.DigestUtils;
+
 
 /**
  * @description TODO
@@ -63,7 +66,7 @@ public class MediaFileServiceImpl implements MediaFileService {
   @Value("${minio.bucket.files}")
   private String bucketMediaFiles;
   //存储mp4文件
-  @Value("${mino.bucket.videofiles}")
+  @Value("${minio.bucket.videofiles}")
   private String bucketVedio;
 
  @Override
@@ -114,71 +117,64 @@ public class MediaFileServiceImpl implements MediaFileService {
   }
   return false;
  }
- private String getDefaultFolderPath() {
+ private String getFileFolder() {
   SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
   String folder =  simpleDateFormat.format(new Date()).replace("-","/")+ "/";
   return folder;
  }
- private String getFileMd5(File file) {
-  try {
-   FileInputStream fileInputStream = new FileInputStream(file);
-   String md5Hex = DigestUtils.md5Hex(fileInputStream);
-   return md5Hex;
-  } catch (Exception e) {
-    e.printStackTrace();
-    return null;
-  }
 
- }
- @Transactional
+
+
  @Override
- public UploadFileResultDto uploadFile(Long companyId, UploadFileParamsDto uploadFileParamsDto, String localFilePath) {
-  //将文件上传到minio
-  String filename = uploadFileParamsDto.getFilename();
-  String extension = filename.substring(filename.lastIndexOf("."));
-  String mimeType = getMimeType(extension);
-  String defaultFolderPath = getDefaultFolderPath();
-  String fileMd5 = getFileMd5(new File(filename));
-  String objectName = defaultFolderPath + fileMd5 + extension;
-  boolean result = addMediaFilesToMinio(localFilePath, mimeType, bucketMediaFiles, objectName);
-  if (!result) {
-   XueChengPlusException.cast("上传文件到minio失败");
+ public UploadFileResultDto uploadFile(Long companyId, UploadFileParamsDto uploadFileParamsDto, byte[] bytes, String folder, String objectName) {
+  String fileMD5 = DigestUtils.md5Hex(bytes);
+  if (StringUtils.isEmpty(folder)) {
+   // 如果目录不存在，则自动生成一个目录
+   folder = getFileFolder();
   }
-  //将文件信息保存到数据库
-  MediaFiles mediaFiles = addMediaFilesToDb(companyId, fileMd5, uploadFileParamsDto, bucketMediaFiles, objectName);
-  if (mediaFiles == null) {
-   XueChengPlusException.cast("文件上传失败");
+  if (StringUtils.isEmpty(objectName)) {
+   // 如果文件名为空，则设置其默认文件名为文件的md5码 + 文件后缀名
+   String filename = uploadFileParamsDto.getFilename();
+   objectName = fileMD5 + filename.substring(filename.lastIndexOf("."));
   }
-  UploadFileResultDto uploadFileResultDto = new UploadFileResultDto();
-  BeanUtils.copyProperties(mediaFiles, uploadFileResultDto);
-  return uploadFileResultDto;
- }
-
-
-
- public MediaFiles addMediaFilesToDb(Long companyId, String fileMd5, UploadFileParamsDto uploadFileParamsDto, String bucket,String objectName ) {
-  //将文件信息保存到数据库
-  MediaFiles mediaFiles = mediaFilesMapper.selectById(fileMd5);
-  if (mediaFiles == null) {
-   MediaFiles mediaFiles1 = new MediaFiles();
-   BeanUtils.copyProperties(uploadFileParamsDto, mediaFiles1);
-   mediaFiles1.setFileId(fileMd5);
-   mediaFiles1.setCompanyId(companyId);
-   mediaFiles1.setBucket(bucketMediaFiles);
-   mediaFiles1.setBucket(bucket);
-   mediaFiles1.setFilePath(objectName);
-   mediaFiles1.setUrl("/" + bucket + objectName);
-   mediaFiles1.setCreateDate(LocalDateTime.now());
-   mediaFiles1.setStatus("1");
-   mediaFiles1.setAuditStatus("002003");
-   //插入数据库
-   int insert = mediaFilesMapper.insert(mediaFiles1);
-   if (insert <= 0) {
-       log.debug("文件保存到数据库失败,bucket:{},objectName:{}",bucket,objectName);
-       return null;
+  objectName = folder + objectName;
+  try {
+   ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+   // 上传到minio
+   minioClient.putObject(PutObjectArgs.builder()
+           .bucket(bucketMediaFiles)
+           .object(objectName)
+           .stream(byteArrayInputStream, byteArrayInputStream.available(), -1)
+           .contentType(uploadFileParamsDto.getContentType())
+           .build());
+   // 保存到数据库
+   MediaFiles mediaFiles = mediaFilesMapper.selectById(fileMD5);
+   if (mediaFiles == null) {
+    mediaFiles = new MediaFiles();
+    BeanUtils.copyProperties(uploadFileParamsDto, mediaFiles);
+    mediaFiles.setId(fileMD5);
+    mediaFiles.setFileId(fileMD5);
+    mediaFiles.setCompanyId(companyId);
+    mediaFiles.setBucket(bucketMediaFiles);
+    mediaFiles.setCreateDate(LocalDateTime.now());
+    mediaFiles.setStatus("1");
+    mediaFiles.setFilePath(objectName);
+    mediaFiles.setUrl("/" + bucketMediaFiles + "/" + objectName);
+    // 查阅数据字典，002003表示审核通过
+    mediaFiles.setAuditStatus("002003");
    }
-   return mediaFiles1;
+   int insert = mediaFilesMapper.insert(mediaFiles);
+   if (insert <= 0) {
+    XueChengPlusException.cast("保存文件信息失败");
+   }
+   UploadFileResultDto uploadFileResultDto = new UploadFileResultDto();
+   BeanUtils.copyProperties(mediaFiles, uploadFileResultDto);
+   return uploadFileResultDto;
+  } catch (Exception e) {
+   XueChengPlusException.cast("上传过程中出错");
   }
-  return mediaFiles;
+  return null;
  }
+
+
 }
