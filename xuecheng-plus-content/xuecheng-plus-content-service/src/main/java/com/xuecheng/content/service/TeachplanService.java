@@ -1,7 +1,9 @@
 package com.xuecheng.content.service;
 
+import com.xuecheng.content.model.dto.BindTeachplanMediaDto;
 import com.xuecheng.content.model.dto.SaveTeachplanDto;
 import com.xuecheng.content.model.dto.TeachplanDto;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -28,4 +30,7 @@ public interface TeachplanService {
  public void deleteTeachplan(Long teachplanId);
 
  void orderByTeachplan(String moveType, Long teachplanId);
+
+ @Transactional
+ void associationMedia(BindTeachplanMediaDto bindTeachplanMediaDto);
 }

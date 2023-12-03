@@ -17,6 +17,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * ClassName: MinioTest
@@ -33,6 +36,7 @@ public class MinioTest {
                     .endpoint("http://127.0.0.1:9000")
                     .credentials("minioadmin", "minioadmin")
                     .build();
+
     @Test
     public void testUpload() {
         try {
@@ -62,6 +66,7 @@ public class MinioTest {
             System.out.println("删除失败");
         }
     }
+
     @Test
     public void getFileTest() {
         try {
@@ -70,15 +75,44 @@ public class MinioTest {
                     .object("67b8090161e22daa.jpg")
                     .build());
             FileOutputStream fileOutputStream = new FileOutputStream("D:\\123\\123.jpg");
-            IOUtils.copy(inputStream,fileOutputStream);
+            IOUtils.copy(inputStream, fileOutputStream);
             String source_md5 = DigestUtils.md5DigestAsHex(inputStream);
             String local_md5 = DigestUtils.md5DigestAsHex(new FileInputStream(("D:\\123\\123.jpg")));
-            if (source_md5.equals(local_md5)){
+            if (source_md5.equals(local_md5)) {
                 System.out.println("下载成功");
             }
         } catch (Exception e) {
             System.out.println("下载失败");
         }
     }
-}
 
+    @Test
+    public void uploadChunk() throws IOException, ServerException, InsufficientDataException, ErrorResponseException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
+        for (int i = 0; i < 5; i++) {
+            minioClient.uploadObject(
+                    UploadObjectArgs.builder()
+                            .bucket("testbucket")
+                            .object("chunk/" + i)    // 同一个桶内对象名不能重复
+                            .filename("D:\\123\\chunk\\chunk_test" + i)
+                            .build()
+            );
+        }
+    }
+
+    @Test
+    public void testMerge() throws ServerException, InsufficientDataException, ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
+        List<ComposeSource> sources = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            ComposeSource composeSource = ComposeSource.builder()
+                    .bucket("testbucket")
+                    .object("chunk/" + i)
+                    .build();
+            sources.add(composeSource);
+        }
+        minioClient.composeObject(ComposeObjectArgs.builder()
+                .bucket("testbucket")
+                .object("merge01.mp4")
+                .sources(sources)
+                .build());
+    }
+}
